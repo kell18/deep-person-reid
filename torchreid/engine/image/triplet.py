@@ -1,5 +1,7 @@
 from __future__ import division, print_function, absolute_import
 
+from typing import Callable
+
 from torchreid import metrics
 from torchreid.losses import TripletLoss, CrossEntropyLoss
 
@@ -69,9 +71,10 @@ class ImageTripletEngine(Engine):
         weight_x=1,
         scheduler=None,
         use_gpu=True,
-        label_smooth=True
+        label_smooth=True,
+        log_metrics: Callable[[dict[str, any]], any] | None = None
     ):
-        super(ImageTripletEngine, self).__init__(datamanager, use_gpu)
+        super(ImageTripletEngine, self).__init__(datamanager, use_gpu, log_metrics)
 
         self.model = model
         self.optimizer = optimizer

@@ -1,5 +1,7 @@
 from __future__ import division, print_function, absolute_import
 import time
+from typing import Callable
+
 import numpy as np
 import os.path as osp
 import datetime
@@ -25,11 +27,14 @@ class Engine(object):
         use_gpu (bool, optional): use gpu. Default is True.
     """
 
-    def __init__(self, datamanager, use_gpu=True):
+    def __init__(self, datamanager, use_gpu=True, log_metrics: Callable[[dict[str, any]], any] | None = None):
         self.datamanager = datamanager
         self.train_loader = self.datamanager.train_loader
         self.test_loader = self.datamanager.test_loader
         self.use_gpu = (torch.cuda.is_available() and use_gpu)
+        if not log_metrics:
+            print('Custom metrics printing is disabled.')
+        self.log_metrics = log_metrics if log_metrics else lambda x, y: x
         self.writer = None
         self.epoch = 0
 
@@ -253,6 +258,7 @@ class Engine(object):
                 ) * self.num_batches
                 eta_seconds = batch_time.avg * (nb_this_epoch+nb_future_epochs)
                 eta_str = str(datetime.timedelta(seconds=int(eta_seconds)))
+                self.log_metrics({**loss_summary, 'epoch': self.epoch})
                 print(
                     'epoch: [{0}/{1}][{2}/{3}]\t'
                     'time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
@@ -416,8 +422,12 @@ class Engine(object):
         print('** Results **')
         print('mAP: {:.1%}'.format(mAP))
         print('CMC curve')
+        logged_metrics = {'mAP': mAP, 'epoch': self.epoch}
         for r in ranks:
+            logged_metrics[f'CMC_rank{r}'] = cmc[r - 1].item()
             print('Rank-{:<3}: {:.1%}'.format(r, cmc[r - 1]))
+
+        self.log_metrics(logged_metrics)
 
         if visrank:
             visualize_ranked_results(
